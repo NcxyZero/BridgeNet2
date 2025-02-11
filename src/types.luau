@@ -3,7 +3,7 @@ export type Set<T> = { [T]: true | false }
 export type Array<T> = { [number]: T }
 export type Callback = (...unknown) -> ()
 export type Map<T, K> = { [T]: K }
---
+
 export type MetaMessage = "1"
 
 export type ServerConnectionCallback = (Player, Content) -> ()
