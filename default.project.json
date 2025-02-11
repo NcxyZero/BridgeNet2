@@ -1,6 +1,6 @@
 {
 	"name": "bridgenet2",
 	"tree": {
-		"$path": "build/package"
+		"$path": "src"
 	}
 }
