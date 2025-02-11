@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 --!strict
 local ClientConnection = require(script.Parent.ClientConnection)
 local ClientIdentifiers = require(script.Parent.ClientIdentifiers)
@@ -89,16 +87,15 @@ end
 ]=]
 function clientBridgePrototype:Fire(...)
 	Output.fatalAssert(tostring(self) == "ClientBridge", "Fire called with . instead of :")
-	local content = {...}
+	local content = { ... }
 	if self._outboundMiddleware ~= nil then
 		local result
-		
+
 		if not content[2] then
 			result = content[1]
 		else
 			result = content
 		end
-
 
 		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
 		for _, middlewareFunction: (object: Types.Content) -> any in self._outboundMiddleware do
@@ -150,7 +147,7 @@ end
 	@param callback (content: Types.Content) -> ()
 	@return RBXScriptConnection
 ]=]
-function clientBridgePrototype:Connect(callback: (content: {any}) -> (), name: string?)
+function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name: string?)
 	Output.fatalAssert(tostring(self) == "ClientBridge", "connect called with . instead of :")
 	Output.typecheck("function", "Connect", "callback", callback)
 
@@ -327,9 +324,3 @@ return function(name: string)
 
 	return self
 end
-=======
-src/Client/ClientBridge.luau
->>>>>>> 2821cc0 (	modified:   sourcemap.json)
-=======
-src/Client/ClientBridge.luau
->>>>>>> 2821cc0 (	modified:   sourcemap.json)

@@ -1,20 +1,14 @@
 {
-	"name": "bridgenet2-tests",
-
+	"name": "bridgenet2-test",
 	"tree": {
 		"$className": "DataModel",
-
 		"ReplicatedStorage": {
 			"Packages": {
+				"$className": "Folder",
 				"$path": "Packages",
-
-				"BridgeNet2": {
-					"$path": "src/"
+				"bridgenet2": {
+					"$path": "src"
 				}
-			},
-
-			"tests": {
-				"$path": "tests/roblox/"
 			}
 		}
 	}
