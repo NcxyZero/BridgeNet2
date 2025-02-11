@@ -1,3 +1,4 @@
+--
 type connectionType = { Connected: boolean }
 
 local Connection = {}

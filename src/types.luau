@@ -1,21 +1,52 @@
---[[
-	Private
-]]
-export type Content = unknown
-export type SerializedPacket = {
-	events: {
-		-- The numbers here don't cost anything, because it's an array.
-		[number]: {
-			-- Each value here is an individual call to an event.
-			[number]: Content,
-		},
-	},
+--!strict
+export type Set<T> = { [T]: true | false }
+export type Array<T> = { [number]: T }
+export type Callback = (...unknown) -> ()
+export type Map<T, K> = { [T]: K }
+--
+export type MetaMessage = "1"
 
-	-- The IDs are packed into this buffer
-	buff: buffer,
+export type ServerConnectionCallback = (Player, Content) -> ()
+export type Content = unknown
+export type Identifier = string
+
+-- Player containers
+export type PlayerContainerTypes = "all" | "set" | "except" | "single"
+
+export type SetPlayerContainer = {
+	kind: "set",
+	value: Array<Player>,
 }
 
--- { event, content, event, content, event, content }
-export type Queue = { number | Content }
+export type ExceptPlayerContainer = {
+	kind: "except",
+	value: { [number]: Player },
+}
+
+export type SinglePlayerContainer = {
+	kind: "single",
+	value: Player,
+}
+
+export type AllPlayerContainer = {
+	kind: "all",
+	value: nil,
+}
+
+export type PlayerContainer = SetPlayerContainer | ExceptPlayerContainer | SinglePlayerContainer | AllPlayerContainer
+
+export type PlayerContainerIndexes = {
+	All: () -> AllPlayerContainer,
+	Except: (excludedPlayers: Array<Player>) -> ExceptPlayerContainer,
+	Single: (player: Player) -> SinglePlayerContainer,
+	Players: (players: Array<Player>) -> SetPlayerContainer,
+}
+
+export type ServerInboundPacket = {}
+export type ServerOutboundPacket = {
+	playerContainer: PlayerContainer,
+	content: unknown,
+	id: Identifier,
+}
 
 return nil

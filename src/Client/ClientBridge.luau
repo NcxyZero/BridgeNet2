@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 --!strict
 local ClientConnection = require(script.Parent.ClientConnection)
 local ClientIdentifiers = require(script.Parent.ClientIdentifiers)
@@ -325,3 +326,6 @@ return function(name: string)
 
 	return self
 end
+=======
+src/Client/ClientBridge.luau
+>>>>>>> 2821cc0 (	modified:   sourcemap.json)
