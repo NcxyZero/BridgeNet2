@@ -267,6 +267,8 @@ function clientBridgePrototype:InvokeServerAsync(content: any)
 	local thread = coroutine.running()
 	local connection
 	connection = ClientProcess.connect(self._identifier, function(reply)
+		reply = reply[1]
+
 		if typeof(reply) ~= "table" then
 			return
 		end
