@@ -108,7 +108,7 @@ function ServerProcess.start()
 					-- Initialize the specific identifier queue with the content provided
 					playerContentQueue[identifier] =  {content} 
 				else
-					table.insert(playerContentQueue[identifier], {content})
+					table.insert(playerContentQueue[identifier], content)
 				end
 			end
 		end
@@ -174,6 +174,7 @@ function ServerProcess.start()
 						end
 					end
 				else
+					print(contentQueue)
 					dataRemoteEvent:FireClient(player, contentQueue)
 				end
 

@@ -134,6 +134,7 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 			if name then
 				debug.profilebegin(name)
 			end
+
 			callback(player, table.unpack(content or {}))
 			if name then
 				debug.profileend()
@@ -155,6 +156,8 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 			if name then
 				debug.profilebegin(name)
 			end
+
+			print(content)
 			callback(player, table.unpack(content or {}))
 			if name then
 				debug.profileend()
