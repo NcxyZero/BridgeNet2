@@ -68,7 +68,7 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 	local scriptName = debug.info(2, "s")
 
 	return ServerConnection(self._identifier, function(player, content: any)
-		if content and content[1] and typeof(content[1]) == "table" and not content[2] then
+		if content and typeof(content) == "table" and content[1] and not content[2] then
 			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
 				return
 			end
@@ -100,13 +100,7 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 		end
 
 		if self._inboundMiddleware ~= nil then
-			local result
-
-			if not content[2] then
-				result = content[1]
-			else
-				result = content
-			end
+			local result = content
 
 			-- Loop through the middleware functions- raise a silent log if any of them don't return a table for debugging.
 			for _, middlewareFunction: (player: Player, content: any) -> any in self._inboundMiddleware do
@@ -254,14 +248,7 @@ function serverBridgePrototype:Fire(target: Player | any, ...)
 	end
 
 	if self._outboundMiddleware ~= nil then
-		local result
-		local items = { ... }
-
-		if not items[2] then
-			result = items[1]
-		else
-			result = { ... }
-		end
+		local result = { ... }
 
 		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
 		for _, middlewareFunction: (object: any) -> any in self._outboundMiddleware do
@@ -293,7 +280,7 @@ function serverBridgePrototype:Fire(target: Player | any, ...)
 			Output.log(logOutput)
 		end
 
-		ServerProcess.addToQueue(playerContainer, self._identifier, result)
+		ServerProcess.addToQueue(playerContainer, self._identifier, table.unpack(result))
 	else
 		if self.Logging then
 			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)

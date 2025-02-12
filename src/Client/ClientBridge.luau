@@ -90,6 +90,7 @@ function clientBridgePrototype:Fire(...)
 	if self._outboundMiddleware ~= nil then
 		local result
 
+		print(content)
 		if not content[2] then
 			result = content[1]
 		else
@@ -122,7 +123,7 @@ function clientBridgePrototype:Fire(...)
 			Output.log(logOutput)
 		end
 
-		ClientProcess.addToQueue(self._identifier, result)
+		ClientProcess.addToQueue(self._identifier, table.unpack(result))
 	else
 		if self.Logging then
 			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)
@@ -161,13 +162,7 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 		end
 
 		if self._inboundMiddleware ~= nil then
-			local result
-
-			if not content[2] then
-				result = content[1]
-			else
-				result = content
-			end
+			local result = content
 
 			-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
 			for _, middlewareFunction: (object: any) -> any in self._inboundMiddleware do
