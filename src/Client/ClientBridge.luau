@@ -6,7 +6,6 @@ local Constants = require(script.Parent.Parent.Constants)
 local Output = require(script.Parent.Parent.Utilities.Output)
 local TableKit = require(script.Parent.Parent.Parent.TableKit)
 local RemotePacketSizeCounter = require(script.Parent.Parent.Parent.RemotePacketSizeCounter)
-local Types = require(script.Parent.Parent.Types)
 local NetworkUtils = require(script.Parent.Parent.Utilities.NetworkUtils)
 local tostringData = require(script.Parent.Parent.Utilities.tostringData)
 
@@ -98,7 +97,7 @@ function clientBridgePrototype:Fire(...)
 		end
 
 		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
-		for _, middlewareFunction: (object: Types.Content) -> any in self._outboundMiddleware do
+		for _, middlewareFunction: (object: any) -> any in self._outboundMiddleware do
 			local returned = middlewareFunction(result)
 			if typeof(returned) ~= "table" then
 				Output.silent(
@@ -257,10 +256,13 @@ end
 	@param content any
 	@return any
 ]=]
-function clientBridgePrototype:InvokeServerAsync(content: any)
+function clientBridgePrototype:InvokeServerAsync(...)
 	Output.fatalAssert(tostring(self) == "ClientBridge", "InvokeServerAsync called with . instead of :")
 
 	local id = NetworkUtils.FromHex(NetworkUtils.CreateUUID())
+
+	local content = { ... }
+	table.insert(content, id)
 
 	self:Fire({ ClientIdentifiers.ref("REQUEST", 3, false), id, content })
 
@@ -272,9 +274,13 @@ function clientBridgePrototype:InvokeServerAsync(content: any)
 		if typeof(reply) ~= "table" then
 			return
 		end
+
 		if (reply :: {})[1] == ClientIdentifiers.ref("REQUEST", 3, false) and (reply :: {})[2] == id then
 			connection()
-			task.spawn(thread, (reply :: {})[3])
+
+			table.remove(reply, 1)
+
+			task.spawn(thread, table.unpack(reply[2] or {}))
 		end
 	end)
 	return coroutine.yield()
@@ -287,7 +293,7 @@ end
 	@param func (content: Types.Content) -> ()
 	@return RBXScriptConnection
 ]=]
-function clientBridgePrototype:Once(func: (content: Types.Content) -> ())
+function clientBridgePrototype:Once(func: (content: any) -> ())
 	Output.fatalAssert(tostring(self) == "ClientBridge", "Once called with . instead of :")
 	-- Instantly disconnects. Very basic QoL implementation
 	local connection

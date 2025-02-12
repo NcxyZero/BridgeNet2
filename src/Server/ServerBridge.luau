@@ -3,7 +3,6 @@ local Constants = require(script.Parent.Parent.Constants)
 local RemotePacketSizeCounter = require(script.Parent.Parent.Parent.RemotePacketSizeCounter)
 local ServerProcess = require(script.Parent.ServerProcess)
 local TableKit = require(script.Parent.Parent.Parent.TableKit)
-local Types = require(script.Parent.Parent.Types)
 local Output = require(script.Parent.Parent.Utilities.Output)
 local tostringData = require(script.Parent.Parent.Utilities.tostringData)
 local PlayerContainers = require(script.Parent.PlayerContainers)
@@ -38,7 +37,7 @@ end
 	@within ServerBridge
 	@param middlewareTable {(player: Player, content: Types.Content) -> any}
 ]=]
-function serverBridgePrototype:InboundMiddleware(middlewareTable: { (player: Player, content: Types.Content) -> any })
+function serverBridgePrototype:InboundMiddleware(middlewareTable: { (player: Player, content: any) -> any })
 	Output.fatalAssert(tostring(self) == "ServerBridge", "InboundMiddleware called with . instead of :")
 	self._inboundMiddleware = middlewareTable
 end
@@ -49,9 +48,7 @@ end
 	@within ServerBridge
 	@param middlewareTable {(target: Types.PlayerContainer, content: Types.Content) -> any}
 ]=]
-function serverBridgePrototype:OutboundMiddleware(
-	middlewareTable: { (target: Types.PlayerContainer, ...any) -> any }
-)
+function serverBridgePrototype:OutboundMiddleware(middlewareTable: { (target: any, ...any) -> any })
 	Output.fatalAssert(tostring(self) == "ServerBridge", "OutboundMiddleware called with . instead of :")
 	self._outboundMiddleware = middlewareTable
 end
@@ -71,7 +68,7 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 	local scriptName = debug.info(2, "s")
 
 	return ServerConnection(self._identifier, function(player, content: any)
-		if content and typeof(content[1]) == "table" and not content[2]  then
+		if content and typeof(content[1]) == "table" and not content[2] then
 			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
 				return
 			end
@@ -112,7 +109,7 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 			end
 
 			-- Loop through the middleware functions- raise a silent log if any of them don't return a table for debugging.
-			for _, middlewareFunction: (player: Player, content: Types.Content) -> any in self._inboundMiddleware do
+			for _, middlewareFunction: (player: Player, content: any) -> any in self._inboundMiddleware do
 				local returned = middlewareFunction(player, result)
 				if typeof(returned) ~= "table" then
 					Output.silent(
@@ -218,7 +215,7 @@ end
 	@param callback (player: Player, content: Types.Content) -> ()
 	@return RBXScriptConnection
 ]=]
-function serverBridgePrototype:Once(callback: (player: Player, content: Types.Content) -> ())
+function serverBridgePrototype:Once(callback: (player: Player, content: any) -> ())
 	Output.fatalAssert(tostring(self) == "ServerBridge", "Once called with . instead of :")
 	Output.typecheck("function", "Once", "callback", callback)
 
@@ -237,9 +234,9 @@ end
 	@param target Player | Types.PlayerContainer -- The player which the event should be fired to
 	@param content any -- The packet data which should be sent along
 ]=]
-function serverBridgePrototype:Fire(target: Player | Types.PlayerContainer, ...)
+function serverBridgePrototype:Fire(target: Player | any, ...)
 	Output.fatalAssert(tostring(self) == "ServerBridge", "Fire called with . instead of :")
-	local playerContainer: Types.PlayerContainer
+	local playerContainer
 
 	-- if it's a single player, then create a player container w/ type "single"
 	if typeof(target) == "Instance" then
@@ -258,12 +255,12 @@ function serverBridgePrototype:Fire(target: Player | Types.PlayerContainer, ...)
 
 	if self._outboundMiddleware ~= nil then
 		local result
-		local items = {...}
+		local items = { ... }
 
 		if not items[2] then
 			result = items[1]
 		else
-			result = {...} 
+			result = { ... }
 		end
 
 		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
@@ -329,7 +326,7 @@ return function(name: string)
 		_name = name,
 
 		Logging = false,
-		OnServerInvoke = function() end :: (player: Player, content: Types.Content?) -> ...any,
+		OnServerInvoke = function() end :: (player: Player, content: any) -> ...any,
 
 		-- Rate limiting
 		RateLimitActive = false,
@@ -349,9 +346,8 @@ return function(name: string)
 
 		if self.OnServerInvoke ~= nil then
 			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
-				local reply = self.OnServerInvoke(player, (content :: {})[3])
-
-				self:Fire(player, { ServerIdentifiers.ref("REQUEST"), (content :: {})[2], reply })
+				local reply = { self.OnServerInvoke(player, table.unpack((content :: {})[3] or {})) }
+				self:Fire(player, { ServerIdentifiers.ref("REQUEST"), (content :: {})[2], reply :: any })
 			end
 		end
 	end)
