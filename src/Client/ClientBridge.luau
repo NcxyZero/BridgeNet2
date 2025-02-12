@@ -154,7 +154,7 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 	local scriptName = debug.info(2, "s")
 
 	return ClientConnection(self._identifier, function(content)
-		if content and typeof(content[1]) == "table" and not content[2] then
+		if content and content[1] and typeof(content[1]) == "table" and not content[2] then
 			if (content :: {})[1] == ClientIdentifiers.ref("REQUEST", 3, false) then
 				return
 			end
