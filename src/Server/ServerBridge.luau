@@ -67,7 +67,8 @@ function serverBridgePrototype:Connect(callback: (player: Player, content: { any
 	local line = debug.info(2, "l")
 	local scriptName = debug.info(2, "s")
 
-	return ServerConnection(self._identifier, function(player, content: any)
+	return ServerConnection(self._identifier, function(player, ...)
+		local content = { ... }
 		if content and typeof(content) == "table" and content[1] and not content[2] then
 			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
 				return
