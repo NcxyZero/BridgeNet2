@@ -174,7 +174,7 @@ function ServerProcess.start()
 						end
 					end
 				else
-					dataRemoteEvent:FireClient(player, contentQueue)
+					dataRemoteEvent:FireClient(player, {table.unpack(contentQueue)})
 				end
 
 				-- Clear every single player's content queue, as it was sent out this frame.

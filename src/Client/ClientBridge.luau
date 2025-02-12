@@ -1,172 +1,111 @@
 --!strict
-local ClientConnection = require(script.Parent.ClientConnection)
-local ClientIdentifiers = require(script.Parent.ClientIdentifiers)
-local ClientProcess = require(script.Parent.ClientProcess)
 local Constants = require(script.Parent.Parent.Constants)
-local Output = require(script.Parent.Parent.Utilities.Output)
-local TableKit = require(script.Parent.Parent.Parent.TableKit)
 local RemotePacketSizeCounter = require(script.Parent.Parent.Parent.RemotePacketSizeCounter)
-local NetworkUtils = require(script.Parent.Parent.Utilities.NetworkUtils)
+local ServerProcess = require(script.Parent.ServerProcess)
+local TableKit = require(script.Parent.Parent.Parent.TableKit)
+local Output = require(script.Parent.Parent.Utilities.Output)
 local tostringData = require(script.Parent.Parent.Utilities.tostringData)
+local PlayerContainers = require(script.Parent.PlayerContainers)
+local ServerConnection = require(script.Parent.ServerConnection)
+local ServerIdentifiers = require(script.Parent.ServerIdentifiers)
+
+type TOptionalCallback<T> = (() -> T) | (() -> nil) | (() -> ())
 
 --[=[
-	This class handles the client-sided interface of BridgeNet2.
+	This class handles the server-sided interface of BridgeNet2.
 
-	@class ClientBridge
+	@class ServerBridge
 ]=]
-local clientBridgePrototype = {}
+local serverBridgePrototype = {}
 
-local CLASS_METATABLE = { __index = clientBridgePrototype }
+--[=[
+	Sets a function that runs when the server is invoked by the client, should return some values.
+
+	@within ServerBridge
+	@prop OnServerInvoke (player: Player, content: Types.Content?) -> ...any
+]=]
+
+local CLASS_METATABLE = { __index = serverBridgePrototype }
 
 function CLASS_METATABLE:__tostring()
-	return "ClientBridge"
+	return "ServerBridge"
 end
 
 --[=[
-	Sets the rate limit, cannot be used client-sided.
-	
-	@within ClientBridge
-	@ignore
-	@return string
+	Sets some middleware to run when a bridge is fired from the client. 
+
+	@within ServerBridge
+	@param middlewareTable {(player: Player, content: Types.Content) -> any}
 ]=]
-function clientBridgePrototype:RateLimit()
-	Output.warn("cannot call :RateLimit() from client")
-end
-
---[=[
-	Disables the rate limit, cannot be used client-sided.
-
-	@within ClientBridge
-	@ignore
-	@return string
-]=]
-function clientBridgePrototype:DisableRateLimit()
-	Output.warn("cannot call :DisableRateLimit() from client")
-end
-
---[=[
-	Sets some middleware to run when a bridge is fired from the server. 
-
-	@within ClientBridge
-	@param middlewareTable {(object: any) -> any}
-]=]
-function clientBridgePrototype:InboundMiddleware(middlewareTable: { (object: any) -> any })
-	Output.fatalAssert(tostring(self) == "ClientBridge", "InboundMiddleware called with . instead of :")
-	Output.fatalAssert(
-		typeof(middlewareTable) == "table",
-		string.format("InboundMiddleware takes table, got %*", typeof(middlewareTable))
-	)
-	Output.warnAssert(TableKit.IsArray(middlewareTable), "InboundMiddleware takes array, got dictionary.")
-
+function serverBridgePrototype:InboundMiddleware(middlewareTable: { (player: Player, content: any) -> any })
+	Output.fatalAssert(tostring(self) == "ServerBridge", "InboundMiddleware called with . instead of :")
 	self._inboundMiddleware = middlewareTable
 end
 
 --[=[
-	Sets some middleware to run when a bridge is fired from the local client. 
+	Sets some middleware to run when a bridge is fired from the backend server.
 
-	@within ClientBridge
-	@param middlewareTable {(object: any) -> any}
+	@within ServerBridge
+	@param middlewareTable {(target: Types.PlayerContainer, content: Types.Content) -> any}
 ]=]
-function clientBridgePrototype:OutboundMiddleware(middlewareTable: { (object: any) -> any })
-	Output.fatalAssert(tostring(self) == "ClientBridge", "OutboundMiddleware called with . instead of :")
-	Output.fatalAssert(
-		typeof(middlewareTable) == "table",
-		string.format("OutboundMiddleware takes table, got %*", typeof(middlewareTable))
-	)
-	Output.warnAssert(TableKit.IsArray(middlewareTable), "InboundMiddleware takes array, got dictionary.")
-
+function serverBridgePrototype:OutboundMiddleware(middlewareTable: { (target: any, ...any) -> any })
+	Output.fatalAssert(tostring(self) == "ServerBridge", "OutboundMiddleware called with . instead of :")
 	self._outboundMiddleware = middlewareTable
 end
 
 --[=[
-	Fires the bridge locally, which can then be recieved from the server along with packet data sent along.
+	Connects the bridge to any events recieved from the client, this is when inbound middleware is ran. This shares identical behavior with [RemoteEvent.OnClientEvent].
 
-	@within ClientBridge
-	@param content any
-]=]
-function clientBridgePrototype:Fire(...)
-	Output.fatalAssert(tostring(self) == "ClientBridge", "Fire called with . instead of :")
-	local content = { ... }
-	if self._outboundMiddleware ~= nil then
-		local result
-
-		print(content)
-		if not content[2] then
-			result = content[1]
-		else
-			result = content
-		end
-
-		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
-		for _, middlewareFunction: (object: any) -> any in self._outboundMiddleware do
-			local returned = middlewareFunction(result)
-			if typeof(returned) ~= "table" then
-				Output.silent(
-					string.format(
-						"Inbound middleware on bridge %* did not return a table; ignoring the return.",
-						self._name
-					)
-				)
-			else
-				result = returned
-			end
-		end
-
-		if self.Logging then
-			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)
-			local logOutput = string.format(
-				Constants.CLIENT_FIRE_LOG,
-				self._name,
-				tostringData(result),
-				RemotePacketSizeCounter.GetDataByteSize(result)
-			)
-			Output.log(logOutput)
-		end
-
-		ClientProcess.addToQueue(self._identifier, table.unpack(result))
-	else
-		if self.Logging then
-			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)
-			local logOutput = string.format(
-				Constants.CLIENT_FIRE_LOG,
-				self._name,
-				tostringData(content),
-				RemotePacketSizeCounter.GetDataByteSize(content)
-			)
-			Output.log(logOutput)
-		end
-
-		ClientProcess.addToQueue(self._identifier, content)
-	end
-end
-
---[=[
-	Connects the bridge to any events recieved from the server, this is when inbound middleware is ran. This shares identical behavior with [RemoteEvent.OnServerEvent:Connect].
-	
-	@within ClientBridge
-	@param callback (content: Types.Content) -> ()
+	@within ServerBridge
+	@param callback (player: Player, content: Types.Content) -> nil
 	@return RBXScriptConnection
 ]=]
-function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name: string?)
-	Output.fatalAssert(tostring(self) == "ClientBridge", "connect called with . instead of :")
+function serverBridgePrototype:Connect(callback: (player: Player, content: { any }) -> nil, name: string?)
+	Output.fatalAssert(tostring(self) == "ServerBridge", "Connect called with . instead of :")
 	Output.typecheck("function", "Connect", "callback", callback)
 
 	local line = debug.info(2, "l")
 	local scriptName = debug.info(2, "s")
 
-	return ClientConnection(self._identifier, function(content)
-		if content and content[1] and typeof(content[1]) == "table" and not content[2] then
-			if (content :: {})[1] == ClientIdentifiers.ref("REQUEST", 3, false) then
+	return ServerConnection(self._identifier, function(player, ...)
+		if content and typeof(content) == "table" and content[1] and not content[2] then
+			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
 				return
 			end
 		end
 
+		if self.RateLimitActive then
+			-- get the current second
+			local thisSecond = math.round(os.clock() - os.clock() % 1)
+
+			if self._rateMap[player] ~= nil then
+				local lastSecond = self._rateMap[player][1] or 0
+
+				if lastSecond ~= thisSecond then
+					self._rateMap[player][2] = 0
+
+					self._rateMap[player][1] = thisSecond
+				else
+					self._rateMap[player][2] += 1
+				end
+			else
+				self._rateMap[player] = { thisSecond, 1 }
+			end
+
+			if self._rateMap[player][2] >= self._maxRate then
+				if not self._overflowFunction(player) then
+					return
+				end
+			end
+		end
+
+		local content = { ... }
 		if self._inboundMiddleware ~= nil then
 			local result = content
 
-			-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
-			for _, middlewareFunction: (object: any) -> any in self._inboundMiddleware do
-				local returned = middlewareFunction(result)
+			-- Loop through the middleware functions- raise a silent log if any of them don't return a table for debugging.
+			for _, middlewareFunction: (player: Player, content: any) -> any in self._inboundMiddleware do
+				local returned = middlewareFunction(player, result)
 				if typeof(returned) ~= "table" then
 					Output.silent(
 						string.format(
@@ -181,30 +120,9 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 
 			if self.Logging then
 				local logOutput = string.format(
-					Constants.CLIENT_CONNECT_LOG,
+					Constants.SERVER_CONNECT_LOG,
 					name or self._name,
-					tostringData(result),
-					RemotePacketSizeCounter.GetDataByteSize(result),
-					scriptName,
-					line
-				)
-				Output.log(logOutput)
-			end
-
-			if name then
-				debug.profilebegin(name)
-			end
-
-			callback(table.unpack(content or {}))
-
-			if name then
-				debug.profileend()
-			end
-		else
-			if self.Logging then
-				local logOutput = string.format(
-					Constants.CLIENT_CONNECT_LOG,
-					name or self._name,
+					player.Name,
 					tostringData(content),
 					RemotePacketSizeCounter.GetDataByteSize(content),
 					scriptName,
@@ -216,9 +134,28 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 			if name then
 				debug.profilebegin(name)
 			end
+			callback(player, table.unpack(content or {}))
+			if name then
+				debug.profileend()
+			end
+		else
+			if self.Logging then
+				local logOutput = string.format(
+					Constants.SERVER_CONNECT_LOG,
+					name or self._name,
+					player.Name,
+					tostringData(content),
+					RemotePacketSizeCounter.GetDataByteSize(content),
+					scriptName,
+					line
+				)
+				Output.log(logOutput)
+			end
 
-			callback(table.unpack(content or {}))
-
+			if name then
+				debug.profilebegin(name)
+			end
+			callback(player, table.unpack(content or {}))
 			if name then
 				debug.profileend()
 			end
@@ -227,102 +164,183 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 end
 
 --[=[
-	Connects the bridge to any events recieved from the server, this is when inbound middleware is ran. This shares identical behavior with [RemoteEvent.OnServerEvent:Wait].
-	
-	@within ClientBridge
-	@yields
-	@return any
+	Sets the rate limit, which makes a bridge only allow `invokesPerSecond` invoke per second.
+
+	@within ServerBridge
+	@param invokesPerSecond number -- The maximum invokes per second allowed from the client
+	@param overflowFunction (player: Player) -> nil -- The function to run if the client runs over the maximum amount of request
 ]=]
-function clientBridgePrototype:Wait()
-	Output.fatalAssert(tostring(self) == "ClientBridge", "Wait called with . instead of :")
-	-- Again, very basic QoL implementation of :Wait()
+function serverBridgePrototype:RateLimit(invokesPerSecond: number, overflowFunction: (player: Player) -> nil)
+	Output.fatalAssert(tostring(self) == "ServerBridge", "RateLimit called with . instead of :")
+	self.RateLimitActive = true
+	self._overflowFunction = overflowFunction
+	self._maxRate = invokesPerSecond
+end
+
+--[=[
+	Disables the set rate limit for the bridge.
+	@within ServerBridge
+]=]
+function serverBridgePrototype:DisableRateLimit()
+	Output.fatalAssert(tostring(self) == "ServerBridge", "DisableRateLimit called with . instead of :")
+	self.RateLimitActive = false
+end
+
+--[=[
+	Connects the bridge to any events recieved from the client, this is when inbound middleware is ran. This shares identical behavior with [RemoteEvent.OnClientEvent].
+
+	@within ServerBridge
+	@yields
+	@return Player, any
+]=]
+function serverBridgePrototype:Wait()
+	Output.fatalAssert(tostring(self) == "ServerBridge", "Wait called with . instead of :")
 	local thread = coroutine.running()
-	self:Once(function(content)
+
+	self:Once(function(player, content)
 		coroutine.resume(thread)
 	end)
 	return coroutine.yield()
 end
 
 --[=[
-	Invokes the server, then returns a value afterwards. This function yields the thread until content is recieved.
-	
-	@yields
-	@within ClientBridge
-	@param content any
-	@return any
-]=]
-function clientBridgePrototype:InvokeServerAsync(...)
-	Output.fatalAssert(tostring(self) == "ClientBridge", "InvokeServerAsync called with . instead of :")
+	Connects the bridge to any events recieved from the client, this is when inbound middleware is ran. This shares identical behavior with [ClientBridge:Connect] with the difference being that the event instantly disconnects on recieved.
 
-	local id = NetworkUtils.FromHex(NetworkUtils.CreateUUID())
-
-	local content = { ... }
-
-	self:Fire({ ClientIdentifiers.ref("REQUEST", 3, false), id, content })
-
-	local thread = coroutine.running()
-	local connection
-	connection = ClientProcess.connect(self._identifier, function(reply)
-		reply = reply[1]
-
-		if typeof(reply) ~= "table" then
-			return
-		end
-
-		if (reply :: {})[1] == ClientIdentifiers.ref("REQUEST", 3, false) and (reply :: {})[2] == id then
-			connection()
-
-			table.remove(reply, 1)
-
-			task.spawn(thread, table.unpack(reply[2] or {}))
-		end
-	end)
-	return coroutine.yield()
-end
-
---[=[
-	Connects the bridge to any events recieved from the server, this is when inbound middleware is ran. This shares identical behavior with [clientBridgePrototype:Connect] with the difference being that the event instantly disconnects on recieved.
-	
-	@within ClientBridge
-	@param func (content: Types.Content) -> ()
+	@within ServerBridge
+	@param callback (player: Player, content: Types.Content) -> ()
 	@return RBXScriptConnection
 ]=]
-function clientBridgePrototype:Once(func: (content: any) -> ())
-	Output.fatalAssert(tostring(self) == "ClientBridge", "Once called with . instead of :")
-	-- Instantly disconnects. Very basic QoL implementation
-	local connection
-	connection = self:Connect(function(...)
-		connection:Disconnect()
-		func(...)
-	end)
+function serverBridgePrototype:Once(callback: (player: Player, content: any) -> ())
+	Output.fatalAssert(tostring(self) == "ServerBridge", "Once called with . instead of :")
+	Output.typecheck("function", "Once", "callback", callback)
 
+	local connection
+	connection = self:Connect(function(player, ...)
+		connection:Disconnect()
+		callback(player, ...)
+	end)
 	return connection
 end
 
 --[=[
-	Destroys the bridge it was called on.
-	@within ClientBridge
+	Fires the bridge from the backend server, which can then be recieved from the client along with packet data sent along.
+
+	@within ServerBridge
+	@param target Player | Types.PlayerContainer -- The player which the event should be fired to
+	@param content any -- The packet data which should be sent along
 ]=]
-function clientBridgePrototype:Destroy()
-	Output.fatalAssert(tostring(self) == "ClientBridge", "Destroy called with . instead of :")
-	-- Don't actually do any logic here- remember that ClientBridges are really just listening objects that let the end user communicate.
-	table.clear(self)
-	setmetatable(self, nil)
+function serverBridgePrototype:Fire(target: Player | any, ...)
+	Output.fatalAssert(tostring(self) == "ServerBridge", "Fire called with . instead of :")
+	local playerContainer
+
+	-- if it's a single player, then create a player container w/ type "single"
+	if typeof(target) == "Instance" then
+		if target:IsA("Player") then
+			playerContainer = PlayerContainers.Single(target)
+		else
+			Output.fatal("non-player instance passed into :Fire()")
+		end
+	else
+		if typeof(target) == "nil" then
+			Output.fatal("target parameter passed into ServerBridge:Fire() is nil")
+		end
+		Output.typecheck("table", "Fire", "target", target)
+		playerContainer = target
+	end
+
+	if self._outboundMiddleware ~= nil then
+		local result = { ... }
+
+		-- Loop through the middleware functions- raise a silent log if any of them return nil for debugging.
+		for _, middlewareFunction: (object: any) -> any in self._outboundMiddleware do
+			local returned = middlewareFunction(result)
+			if typeof(returned) ~= "table" then
+				Output.silent(
+					string.format(
+						"Outbound middleware on bridge %* did not return a table; ignoring the return.",
+						self._name
+					)
+				)
+			else
+				result = returned
+			end
+		end
+
+		if self.Logging then
+			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)
+			local logOutput = string.format(
+				Constants.SERVER_FIRE_LOG,
+				self._name,
+				if playerContainer.kind == "all"
+					then "{all}"
+					elseif playerContainer.kind == "single" then playerContainer.value.Name
+					else TableKit.ToArrayString(playerContainer.value),
+				tostringData(result),
+				RemotePacketSizeCounter.GetDataByteSize(result)
+			)
+			Output.log(logOutput)
+		end
+
+		print(result)
+		ServerProcess.addToQueue(playerContainer, self._identifier, ...)
+	else
+		if self.Logging then
+			Output.log(`{debug.info(2, "s")}:{debug.info(2, "l")}`)
+			local logOutput = string.format(
+				Constants.SERVER_FIRE_LOG,
+				self._name,
+				if playerContainer.kind == "all"
+					then "{all}"
+					elseif playerContainer.kind == "single" then playerContainer.value.Name
+					else TableKit.ToArrayString(playerContainer.value),
+				tostringData(...),
+				RemotePacketSizeCounter.GetDataByteSize(...)
+			)
+			Output.log(logOutput)
+		end
+
+		print(...)
+		ServerProcess.addToQueue(playerContainer, self._identifier, ...)
+	end
 end
 
 return function(name: string)
 	local self = setmetatable({
-		Logging = false,
+		-- Since this is the server, ReferenceIdentifier will not yield
+		_identifier = ServerIdentifiers.ref(name),
 
-		_identifier = ClientIdentifiers.ref(name, 3, true),
+		-- Middleware
+		_outboundMiddleware = nil,
+		_inboundMiddleware = nil,
+
 		_name = name,
 
-		_inboundMiddleware = {},
-		_outboundMiddleware = {},
+		Logging = false,
+		OnServerInvoke = function() end :: (player: Player, content: any) -> ...any,
+
+		-- Rate limiting
+		RateLimitActive = false,
+		_maxRate = 500,
+		_rateMap = {} :: { [Player]: { number } },
+		_overflowFunction = function()
+			return false
+		end,
 	}, CLASS_METATABLE)
 
-	-- Identifiers can be created by the end user too, so we have to tell BridgeNet2 that it's a bridge, not an identifier.
-	ClientProcess.registerBridge(self._identifier)
+	ServerProcess.registerBridge(self._identifier)
+
+	ServerProcess.connect(self._identifier, function(player, content)
+		if typeof(content) ~= "table" then
+			return
+		end
+
+		if self.OnServerInvoke ~= nil then
+			if (content :: {})[1] == ServerIdentifiers.ref("REQUEST") then
+				local reply = { self.OnServerInvoke(player, table.unpack((content :: {})[3] or {})) }
+				self:Fire(player, { ServerIdentifiers.ref("REQUEST"), (content :: {})[2], reply :: any })
+			end
+		end
+	end)
 
 	return self
 end
