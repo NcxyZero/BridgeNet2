@@ -262,7 +262,6 @@ function clientBridgePrototype:InvokeServerAsync(...)
 	local id = NetworkUtils.FromHex(NetworkUtils.CreateUUID())
 
 	local content = { ... }
-	table.insert(content, id)
 
 	self:Fire({ ClientIdentifiers.ref("REQUEST", 3, false), id, content })
 
