@@ -188,7 +188,6 @@ function clientBridgePrototype:Connect(callback: (content: { any }) -> (), name:
 				debug.profilebegin(name)
 			end
 
-			print(content, result)
 			callback(table.unpack(result or {}))
 
 			if name then
