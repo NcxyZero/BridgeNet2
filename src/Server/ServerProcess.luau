@@ -174,7 +174,6 @@ function ServerProcess.start()
 						end
 					end
 				else
-					print(contentQueue)
 					dataRemoteEvent:FireClient(player, contentQueue)
 				end
 
